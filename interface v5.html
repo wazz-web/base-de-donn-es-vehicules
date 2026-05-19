@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interface Web de la Base de Données — Cabinet</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f0f13; --surface: #17171f; --border: #2a2a38;
+    --accent: #6ee7b7; --accent2: #f59e0b; --danger: #f87171;
+    --text: #e2e8f0; --muted: #64748b;
+    --font-head: 'Syne', sans-serif; --font-mono: 'DM Mono', monospace;
+  }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-mono); min-height: 100vh; padding: 2rem; }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(110,231,183,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(110,231,183,0.03) 1px, transparent 1px);
+    background-size: 40px 40px; pointer-events: none; z-index: 0;
+  }
+  .container { max-width: 1100px; margin: 0 auto; position: relative; z-index: 1; }
+  header { display: flex; align-items: center; gap: 1.5rem; margin-bottom: 2rem; padding-bottom: 2rem; border-bottom: 1px solid var(--border); }
+  .logo { width: 52px; height: 52px; background: var(--accent); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0; }
+  h1 { font-family: var(--font-head); font-size: 1.8rem; font-weight: 800; letter-spacing: -0.02em; }
+  .subtitle { color: var(--muted); font-size: 0.8rem; margin-top: 2px; }
+  .config-bar { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.5rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+  .config-bar label { color: var(--muted); font-size: 0.75rem; }
+  .config-bar input { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: var(--font-mono); font-size: 0.8rem; padding: 0.4rem 0.8rem; width: 180px; }
+  .config-bar input:focus { outline: none; border-color: var(--accent); }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); margin-left: auto; flex-shrink: 0; }
+  .status-dot.connected { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .status-dot.error { background: var(--danger); }
+  .status-label { font-size: 0.75rem; color: var(--muted); }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.2rem; }
+  .stat-value { font-family: var(--font-head); font-size: 2rem; font-weight: 800; color: var(--accent); }
+  .stat-label { color: var(--muted); font-size: 0.75rem; margin-top: 4px; }
+  .nav-tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  .nav-tab { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); cursor: pointer; font-family: var(--font-mono); font-size: 0.8rem; padding: 0.6rem 1.2rem; transition: all 0.2s; }
+  .nav-tab:hover { border-color: var(--accent); color: var(--accent); }
+  .nav-tab.active { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 500; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 1.5rem; margin-bottom: 1.5rem; display: none; }
+  .panel.active { display: block; }
+  .search-row { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1rem; }
+  .search-input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-family: var(--font-mono); font-size: 0.9rem; padding: 0.75rem 1rem; transition: border-color 0.2s; }
+  .search-input:focus { outline: none; border-color: var(--accent); }
+  .search-input::placeholder { color: var(--muted); }
+  .btn { background: var(--accent); border: none; border-radius: 10px; color: var(--bg); cursor: pointer; font-family: var(--font-mono); font-size: 0.85rem; font-weight: 500; padding: 0.75rem 1.5rem; transition: opacity 0.2s, transform 0.1s; white-space: nowrap; }
+  .btn:hover { opacity: 0.85; }
+  .btn:active { transform: scale(0.97); }
+  .btn-danger { background: var(--danger); color: white; }
+  .btn-warning { background: var(--accent2); color: var(--bg); }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-sm { padding: 0.4rem 0.8rem; font-size: 0.75rem; border-radius: 6px; }
+  .filter-btns { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .filter-btn { background: transparent; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); cursor: pointer; font-family: var(--font-mono); font-size: 0.78rem; padding: 0.5rem 1rem; transition: all 0.2s; }
+  .filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .filter-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(110,231,183,0.1); }
+  .filter-btn.danger.active { border-color: var(--danger); color: var(--danger); background: rgba(248,113,113,0.1); }
+  .filter-btn.warning.active { border-color: var(--accent2); color: var(--accent2); background: rgba(245,158,11,0.1); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  th { color: var(--muted); font-weight: 400; padding: 0.6rem 0.8rem; text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
+  td { padding: 0.7rem 0.8rem; border-bottom: 1px solid rgba(42,42,56,0.5); vertical-align: middle; }
+  tr:hover td { background: rgba(110,231,183,0.03); }
+  .badge { display: inline-block; border-radius: 6px; font-size: 0.7rem; padding: 0.2rem 0.6rem; font-weight: 500; }
+  .badge-loue { background: rgba(110,231,183,0.15); color: var(--accent); }
+  .badge-dispo { background: rgba(148,163,184,0.15); color: #94a3b8; }
+  .badge-vole { background: rgba(248,113,113,0.15); color: var(--danger); }
+  .badge-vendu { background: rgba(245,158,11,0.15); color: var(--accent2); }
+  .badge-other { background: rgba(100,116,139,0.15); color: var(--muted); }
+  .results-count { font-size: 0.8rem; color: var(--muted); margin-bottom: 1rem; }
+  .results-count span { color: var(--accent); font-weight: 500; }
+  .empty { text-align: center; padding: 3rem; color: var(--muted); font-size: 0.85rem; }
+  .loading { text-align: center; padding: 2rem; color: var(--accent); font-size: 0.85rem; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .alert { border-radius: 10px; font-size: 0.82rem; padding: 0.8rem 1rem; margin: 1rem 0; }
+  .alert-success { background: rgba(110,231,183,0.1); border: 1px solid rgba(110,231,183,0.3); color: var(--accent); }
+  .alert-error { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.3); color: var(--danger); }
+  /* Formulaire */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+  .form-group { display: flex; flex-direction: column; gap: 0.4rem; }
+  .form-group label { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .form-group input, .form-group select {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: var(--font-mono); font-size: 0.85rem; padding: 0.65rem 0.9rem;
+  }
+  .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--accent); }
+  .form-group select option { background: var(--surface); }
+  /* Modal */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; display: none; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; width: 90%; max-width: 500px; }
+  .modal h3 { font-family: var(--font-head); font-size: 1.2rem; margin-bottom: 1.5rem; }
+  .modal-footer { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem; }
+  .actions-cell { display: flex; gap: 0.4rem; }
+
+  .login-overlay { position: fixed; inset: 0; background: #0f0f13; z-index: 1000; display: flex; align-items: center; justify-content: center; }
+  .login-box { background: #17171f; border: 1px solid #2a2a38; border-radius: 20px; padding: 2.5rem; width: 100%; max-width: 400px; text-align: center; }
+  .login-logo { width: 64px; height: 64px; background: #6ee7b7; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto 1.5rem; }
+  .login-title { font-family: 'Syne', sans-serif; font-size: 1.6rem; font-weight: 800; margin-bottom: 0.5rem; }
+  .login-sub { color: #64748b; font-size: 0.8rem; margin-bottom: 2rem; }
+  .login-input { width: 100%; background: #0f0f13; border: 1px solid #2a2a38; border-radius: 10px; color: #e2e8f0; font-family: 'DM Mono', monospace; font-size: 0.9rem; padding: 0.75rem 1rem; margin-bottom: 1rem; }
+  .login-input:focus { outline: none; border-color: #6ee7b7; }
+  .login-btn { width: 100%; background: #6ee7b7; border: none; border-radius: 10px; color: #0f0f13; cursor: pointer; font-family: 'DM Mono', monospace; font-size: 0.9rem; font-weight: 500; padding: 0.85rem; transition: opacity 0.2s; }
+  .login-btn:hover { opacity: 0.85; }
+  .login-error { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.3); border-radius: 8px; color: #f87171; font-size: 0.82rem; padding: 0.7rem; margin-bottom: 1rem; display: none; }
+  .logout-btn { background: transparent; border: 1px solid #2a2a38; border-radius: 8px; color: #64748b; cursor: pointer; font-family: 'DM Mono', monospace; font-size: 0.75rem; padding: 0.4rem 0.8rem; margin-left: auto; transition: all 0.2s; }
+  .logout-btn:hover { border-color: #f87171; color: #f87171; }
+</style>
+</head>
+<body>
+
+<!-- Page de login -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <div class="login-logo">🚗</div>
+    <div class="login-title">Interface Web de la Base de Données</div>
+    <div class="login-sub">Cabinet Expert Comptable — Connexion requise</div>
+    <div class="login-error" id="loginError">Identifiants incorrects. Réessayez.</div>
+    <input class="login-input" type="text" id="loginUser" placeholder="Identifiant" onkeydown="if(event.key==='Enter') seConnecter()">
+    <input class="login-input" type="password" id="loginPass" placeholder="Mot de passe" onkeydown="if(event.key==='Enter') seConnecter()">
+    <button class="login-btn" onclick="seConnecter()">Se connecter</button>
+  </div>
+</div>
+
+<div class="container">
+  <header>
+    <div class="logo">🚗</div>
+    <div>
+      <h1>Interface Web de la Base de Données</h1>
+      <div class="subtitle">Cabinet Expert Comptable — Gestion de flotte</div>
+    </div>
+    <button class="logout-btn" onclick="seDeconnecter()">Déconnexion</button>
+    <div style="display:none">
+    </div>
+  </header>
+
+  <div class="config-bar">
+    <label>Serveur :</label>
+    <input type="text" id="apiUrl" value="http://10.2.36.170:5000">
+    <button class="btn" onclick="testerConnexion()" style="padding:0.4rem 1rem;font-size:0.78rem;">Tester</button>
+    <div style="display:flex;align-items:center;gap:0.5rem;margin-left:auto;">
+      <div class="status-dot" id="statusDot"></div>
+      <span class="status-label" id="statusLabel">Non connecté</span>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-value" id="statTotal">—</div><div class="stat-label">Total</div></div>
+    <div class="stat-card"><div class="stat-value" id="statLoue" style="color:var(--accent)">—</div><div class="stat-label">Loués</div></div>
+    <div class="stat-card"><div class="stat-value" id="statVole" style="color:var(--danger)">—</div><div class="stat-label">Volés</div></div>
+    <div class="stat-card"><div class="stat-value" id="statDispo" style="color:#94a3b8">—</div><div class="stat-label">Disponibles</div></div>
+  </div>
+
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="switchTab('recherche')">🔍 Recherche</button>
+    <button class="nav-tab" onclick="switchTab('ajouter')">➕ Ajouter</button>
+    <button class="nav-tab" onclick="switchTab('etat')">📋 Par État</button>
+  </div>
+
+  <!-- Panel Recherche -->
+  <div class="panel active" id="panel-recherche">
+    <div style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;">
+      <button class="filter-btn active" onclick="setType('immat',this)">Immatriculation</button>
+      <button class="filter-btn" onclick="setType('client',this)">Client</button>
+      <button class="filter-btn" onclick="setType('marque',this)">Marque</button>
+    </div>
+    <div class="search-row" id="searchRowInput">
+      <input class="search-input" id="searchInput" placeholder="Tapez votre recherche..." onkeydown="if(event.key==='Enter') rechercher()">
+      <button class="btn" onclick="rechercher()">Rechercher</button>
+    </div>
+    <div class="search-row" id="searchRowClient" style="display:none">
+      <select class="search-input" id="searchClientSelect" style="cursor:pointer">
+        <option value="">— Sélectionner un client —</option>
+        <option value="AKNM">AKNM</option>
+        <option value="ALLROAD">ALLROAD</option>
+        <option value="CARROSSA RENT">CARROSSA RENT</option>
+        <option value="EXPERT AUTO">EXPERT AUTO</option>
+        <option value="FERHA TRANSPORT">FERHA TRANSPORT</option>
+        <option value="LET'S GO">LET'S GO</option>
+        <option value="LUXE DRIVE">LUXE DRIVE</option>
+        <option value="LYNN EXPRESS">LYNN EXPRESS</option>
+        <option value="M. AKKAL">M. AKKAL</option>
+        <option value="MOUNA">MOUNA</option>
+        <option value="SONIC TRANSPORT">SONIC TRANSPORT</option>
+        <option value="nouveau">➕ Nouveau client...</option>
+      </select>
+      <button class="btn" onclick="rechercherClient()">Rechercher</button>
+    </div>
+    <div id="searchNouveauClientDiv" style="display:none;margin-top:0.5rem">
+      <input class="search-input" id="searchNouveauClient" placeholder="Tapez le nom du client..." style="width:100%">
+    </div>
+    <div id="result-recherche"></div>
+  </div>
+
+  <!-- Panel Ajouter -->
+  <div class="panel" id="panel-ajouter">
+    <h3 style="font-family:var(--font-head);font-size:1.1rem;margin-bottom:1.5rem;">➕ Ajouter un véhicule</h3>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Immatriculation *</label>
+        <input type="text" id="add_immat" placeholder="Ex: AB-123-CD">
+      </div>
+      <div class="form-group">
+        <label>VIN</label>
+        <input type="text" id="add_vin" placeholder="Numéro de série">
+      </div>
+      <div class="form-group">
+        <label>Marque *</label>
+        <input type="text" id="add_marque" placeholder="Ex: RENAULT">
+      </div>
+      <div class="form-group">
+        <label>Modèle *</label>
+        <input type="text" id="add_modele" placeholder="Ex: TRAFIC">
+      </div>
+      <div class="form-group">
+        <label>Propriétaire *</label>
+        <input type="text" id="add_proprio" placeholder="Ex: CREDIPAR">
+      </div>
+      <div class="form-group">
+        <label>Client locataire *</label>
+        <select id="add_client" onchange="toggleNouveauClient()">
+          <option value="">— Sélectionner un client —</option>
+          <option value="AKNM">AKNM</option>
+          <option value="ALLROAD">ALLROAD</option>
+          <option value="CARROSSA RENT">CARROSSA RENT</option>
+          <option value="EXPERT AUTO">EXPERT AUTO</option>
+          <option value="FERHA TRANSPORT">FERHA TRANSPORT</option>
+          <option value="LET'S GO">LET'S GO</option>
+          <option value="LUXE DRIVE">LUXE DRIVE</option>
+          <option value="LYNN EXPRESS">LYNN EXPRESS</option>
+          <option value="M. AKKAL">M. AKKAL</option>
+          <option value="MOUNA">MOUNA</option>
+          <option value="SONIC TRANSPORT">SONIC TRANSPORT</option>
+          <option value="BH TRANSPORTS">BH TRANSPORTS</option>
+          <option value="nouveau">➕ Ajouter un nouveau client...</option>
+        </select>
+      </div>
+      <div class="form-group" id="nouveauClientDiv" style="display:none">
+        <label>Nom du nouveau client *</label>
+        <input type="text" id="add_nouveau_client" placeholder="Tapez le nom du nouveau client">
+      </div>
+      <div class="form-group">
+        <label>État</label>
+        <select id="add_etat">
+          <option value="Disponible">Disponible</option>
+          <option value="Loué">Loué</option>
+          <option value="Volé">Volé</option>
+          <option value="Vendu">Vendu</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Loyer mensuel (€) *</label>
+        <input type="number" id="add_loyer" placeholder="Ex: 1200">
+      </div>
+      <div class="form-group">
+        <label>Date début contrat *</label>
+        <input type="date" id="add_date_debut">
+      </div>
+      <div class="form-group">
+        <label>Date de restitution</label>
+        <input type="date" id="add_date_restitution">
+      </div>
+    </div>
+    <div id="alert-ajouter"></div>
+    <button class="btn" onclick="ajouterVehicule()">✅ Enregistrer le véhicule</button>
+  </div>
+
+  <!-- Panel Etat -->
+  <div class="panel" id="panel-etat">
+    <div class="filter-btns">
+      <button class="filter-btn active" onclick="filtrerEtat('Loué',this)">✅ Loués</button>
+      <button class="filter-btn danger" onclick="filtrerEtat('Volé',this)">🚨 Volés</button>
+      <button class="filter-btn" onclick="filtrerEtat('Disponible',this)">⬜ Disponibles</button>
+      <button class="filter-btn warning" onclick="filtrerEtat('Vendu',this)">💰 Vendus</button>
+      <button class="filter-btn" onclick="filtrerEtat('',this)">📋 Tous</button>
+    </div>
+    <div id="result-etat"></div>
+  </div>
+</div>
+
+<!-- Modal Modifier -->
+<div class="modal-overlay" id="modalModifier">
+  <div class="modal">
+    <h3>✏️ Modifier le véhicule</h3>
+    <input type="hidden" id="mod_contrat_id">
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Nouvel état</label>
+        <select id="mod_etat">
+          <option value="">— Pas de changement —</option>
+          <option value="Loué">Loué</option>
+          <option value="Disponible">Disponible</option>
+          <option value="Volé">Volé</option>
+          <option value="Vendu">Vendu</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Nouveau client</label>
+        <input type="text" id="mod_client" placeholder="Nouveau client...">
+      </div>
+      <div class="form-group">
+        <label>Date début contrat</label>
+        <input type="date" id="mod_date_debut">
+      </div>
+      <div class="form-group">
+        <label>Date de restitution</label>
+        <input type="date" id="mod_date_restitution">
+      </div>
+    </div>
+    <div id="alert-modifier"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline btn-sm" onclick="fermerModal()">Annuler</button>
+      <button class="btn btn-sm" onclick="modifierVehicule()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Supprimer -->
+<div class="modal-overlay" id="modalSupprimer">
+  <div class="modal">
+    <h3>🗑️ Supprimer le véhicule</h3>
+    <p style="color:var(--muted);font-size:0.85rem;margin-bottom:1rem;">Êtes-vous sûr de vouloir supprimer <strong id="del_immat" style="color:var(--danger)"></strong> ? Cette action est irréversible.</p>
+    <input type="hidden" id="del_vehicule_id">
+    <div id="alert-supprimer"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline btn-sm" onclick="fermerModal()">Annuler</button>
+      <button class="btn btn-danger btn-sm" onclick="supprimerVehicule()">Supprimer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+
+let authToken = null;
+
+async function seConnecter() {
+  const user = document.getElementById('loginUser').value.trim();
+  const pass = document.getElementById('loginPass').value.trim();
+  fetch(API() + '/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: user, password: pass })
+  }).then(r => r.json()).then(data => {
+    if (data.success) {
+      authToken = user + ':' + pass;
+      document.getElementById('loginOverlay').style.display = 'none';
+      testerConnexion();
+    } else {
+      document.getElementById('loginError').style.display = 'block';
+    }
+  }).catch(() => {
+    document.getElementById('loginError').textContent = 'Impossible de contacter le serveur.';
+    document.getElementById('loginError').style.display = 'block';
+  });
+}
+
+function seDeconnecter() {
+  authToken = null;
+  document.getElementById('loginOverlay').style.display = 'flex';
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+}
+
+function getHeaders() {
+  return { 'Content-Type': 'application/json', 'X-Auth': authToken || '' };
+}
+
+const API = () => document.getElementById('apiUrl').value.replace(/\/$/, '');
+let searchType = 'immat';
+
+async function testerConnexion() {
+  const dot = document.getElementById('statusDot');
+  const label = document.getElementById('statusLabel');
+  dot.className = 'status-dot'; label.textContent = 'Connexion...';
+  try {
+    const r = await fetch(API() + '/stats', { signal: AbortSignal.timeout(4000), headers: getHeaders() });
+    if (r.ok) {
+      const data = await r.json();
+      dot.className = 'status-dot connected'; label.textContent = 'Connecté';
+      document.getElementById('statTotal').textContent = data.total || '—';
+      document.getElementById('statLoue').textContent = data.loue || '—';
+      document.getElementById('statVole').textContent = data.vole || '—';
+      document.getElementById('statDispo').textContent = data.disponible || '—';
+    } else throw new Error();
+  } catch {
+    dot.className = 'status-dot error'; label.textContent = 'Erreur de connexion';
+  }
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.nav-tab').forEach((t,i) => t.classList.toggle('active', ['recherche','ajouter','etat'][i] === name));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  if (name === 'etat') filtrerEtat('Loué', document.querySelector('#panel-etat .filter-btn'));
+}
+
+function setType(type, btn) {
+  searchType = type;
+  document.querySelectorAll('#panel-recherche .filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const placeholders = { immat: 'Ex: GJ-682-RH', marque: 'Ex: RENAULT' };
+  if (type === 'client') {
+    document.getElementById('searchRowInput').style.display = 'none';
+    document.getElementById('searchRowClient').style.display = 'flex';
+  } else {
+    document.getElementById('searchRowInput').style.display = 'flex';
+    document.getElementById('searchRowClient').style.display = 'none';
+    document.getElementById('searchNouveauClientDiv').style.display = 'none';
+    document.getElementById('searchInput').placeholder = placeholders[type];
+  }
+}
+
+function rechercherClient() {
+  let val = document.getElementById('searchClientSelect').value;
+  if (val === 'nouveau') {
+    val = document.getElementById('searchNouveauClient').value.trim();
+  }
+  if (!val) return;
+  document.getElementById('searchInput').value = val;
+  searchType = 'client';
+  rechercher();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const sel = document.getElementById('searchClientSelect');
+  if (sel) {
+    sel.addEventListener('change', function() {
+      const div = document.getElementById('searchNouveauClientDiv');
+      if (this.value === 'nouveau') {
+        div.style.display = 'block';
+      } else {
+        div.style.display = 'none';
+      }
+    });
+  }
+});
+
+async function rechercher() {
+  const q = document.getElementById('searchInput').value.trim();
+  if (!q) return;
+  const div = document.getElementById('result-recherche');
+  div.innerHTML = '<div class="loading">Recherche...</div>';
+  try {
+    const r = await fetch(`${API()}/search?type=${searchType}&q=${encodeURIComponent(q)}`, { headers: getHeaders() });
+    const data = await r.json();
+    afficherResultats(div, data, true);
+  } catch {
+    div.innerHTML = '<div class="alert alert-error">❌ Impossible de contacter le serveur.</div>';
+  }
+}
+
+async function filtrerEtat(etat, btn) {
+  document.querySelectorAll('#panel-etat .filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const div = document.getElementById('result-etat');
+  div.innerHTML = '<div class="loading">Chargement...</div>';
+  try {
+    const url = etat ? `${API()}/search?type=etat&q=${encodeURIComponent(etat)}` : `${API()}/search?type=tous`;
+    const r = await fetch(url, { headers: getHeaders() });
+    const data = await r.json();
+    afficherResultats(div, data, true);
+  } catch {
+    div.innerHTML = '<div class="alert alert-error">❌ Impossible de contacter le serveur.</div>';
+  }
+}
+
+function badgeEtat(etat) {
+  if (!etat) return '<span class="badge badge-other">—</span>';
+  const e = etat.toLowerCase();
+  if (e.includes('lou')) return `<span class="badge badge-loue">Loué</span>`;
+  if (e.includes('vol')) return `<span class="badge badge-vole">Volé</span>`;
+  if (e.includes('dispo')) return `<span class="badge badge-dispo">Disponible</span>`;
+  if (e.includes('vendu')) return `<span class="badge badge-vendu">Vendu</span>`;
+  return `<span class="badge badge-other">${etat}</span>`;
+}
+
+function afficherResultats(div, data, avecActions = false) {
+  if (!data.length) { div.innerHTML = '<div class="empty">Aucun résultat.</div>'; return; }
+  div.innerHTML = `
+    <div class="results-count"><span>${data.length}</span> résultat${data.length > 1 ? 's' : ''}</div>
+    <table>
+      <thead><tr>
+        <th>Immatriculation</th><th>Marque</th><th>Modèle</th>
+        <th>Client</th><th>Propriétaire</th><th>État</th><th>Loyer</th>
+        <th>Début contrat</th><th>Restitution</th>
+        ${avecActions ? '<th>Actions</th>' : ''}
+      </tr></thead>
+      <tbody>
+        ${data.map(r => `<tr>
+          <td><strong>${r.immatriculation || '—'}</strong></td>
+          <td>${r.marque || '—'}</td>
+          <td>${r.modele || '—'}</td>
+          <td>${r.client_locataire || '—'}</td>
+          <td>${r.proprietaire || '—'}</td>
+          <td>${badgeEtat(r.etat)}</td>
+          <td>${r.montant_loyer ? r.montant_loyer + ' €' : '—'}</td>
+          <td>${r.date_debut || '—'}</td>
+          <td>${r.date_restitution || '—'}</td>
+          ${avecActions ? `<td><div class="actions-cell">
+            <button class="btn btn-warning btn-sm" onclick='ouvrirModifier(${JSON.stringify(r)})'>✏️</button>
+            <button class="btn btn-danger btn-sm" onclick='ouvrirSupprimer(${r.id},"${r.immatriculation}")'>🗑️</button>
+          </div></td>` : ''}
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function ouvrirModifier(row) {
+  document.getElementById('mod_contrat_id').value = row.contrat_id;
+  document.getElementById('mod_etat').value = '';
+  document.getElementById('mod_client').value = '';
+  document.getElementById('mod_date_debut').value = row.date_debut || '';
+  document.getElementById('mod_date_restitution').value = row.date_restitution || '';
+  document.getElementById('alert-modifier').innerHTML = '';
+  document.getElementById('modalModifier').classList.add('open');
+}
+
+function ouvrirSupprimer(id, immat) {
+  document.getElementById('del_vehicule_id').value = id;
+  document.getElementById('del_immat').textContent = immat;
+  document.getElementById('alert-supprimer').innerHTML = '';
+  document.getElementById('modalSupprimer').classList.add('open');
+}
+
+function fermerModal() {
+  document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open'));
+}
+
+function toggleNouveauClient() {
+  const select = document.getElementById('add_client');
+  const div = document.getElementById('nouveauClientDiv');
+  if (select.value === 'nouveau') {
+    div.style.display = 'flex';
+    document.getElementById('add_nouveau_client').focus();
+  } else {
+    div.style.display = 'none';
+    document.getElementById('add_nouveau_client').value = '';
+  }
+}
+
+async function ajouterVehicule() {
+  const immat = document.getElementById('add_immat').value.trim();
+  const marque = document.getElementById('add_marque').value.trim();
+  const modele = document.getElementById('add_modele').value.trim();
+  const proprio = document.getElementById('add_proprio').value.trim();
+  let client = document.getElementById('add_client').value.trim();
+  if (client === 'nouveau') {
+    client = document.getElementById('add_nouveau_client').value.trim();
+    if (!client) {
+      document.getElementById('alert-ajouter').innerHTML = '<div class="alert alert-error">❌ Veuillez saisir le nom du nouveau client.</div>';
+      return;
+    }
+    // Ajouter le nouveau client dans la liste déroulante
+    const select = document.getElementById('add_client');
+    const option = new Option(client, client);
+    select.insertBefore(option, select.options[select.options.length - 1]);
+    select.value = client;
+    document.getElementById('nouveauClientDiv').style.display = 'none';
+  }
+  const loyer = document.getElementById('add_loyer').value.trim();
+  const date_debut = document.getElementById('add_date_debut').value.trim();
+  if (!immat || !marque || !modele || !proprio || !client || !loyer || !date_debut) {
+    document.getElementById('alert-ajouter').innerHTML = '<div class="alert alert-error">❌ Tous les champs obligatoires (*) doivent être remplis.</div>';
+    return;
+  }
+  try {
+    const r = await fetch(`${API()}/ajouter`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        immatriculation: immat, vin: document.getElementById('add_vin').value,
+        marque, modele, proprietaire: document.getElementById('add_proprio').value,
+        client_locataire: document.getElementById('add_client').value,
+        etat: document.getElementById('add_etat').value,
+        montant_loyer: document.getElementById('add_loyer').value || null
+      })
+    });
+    const data = await r.json();
+    if (data.success) {
+      document.getElementById('alert-ajouter').innerHTML = `<div class="alert alert-success">✅ ${data.message}</div>`;
+      ['add_immat','add_vin','add_marque','add_modele','add_proprio','add_loyer','add_date_debut','add_date_restitution','add_nouveau_client'].forEach(id => document.getElementById(id).value = ''); document.getElementById('add_client').value = ''; document.getElementById('nouveauClientDiv').style.display = 'none';
+      testerConnexion();
+    } else {
+      document.getElementById('alert-ajouter').innerHTML = `<div class="alert alert-error">❌ ${data.message}</div>`;
+    }
+  } catch {
+    document.getElementById('alert-ajouter').innerHTML = '<div class="alert alert-error">❌ Erreur de connexion.</div>';
+  }
+}
+
+async function modifierVehicule() {
+  const contrat_id = document.getElementById('mod_contrat_id').value;
+  const etat = document.getElementById('mod_etat').value;
+  const client = document.getElementById('mod_client').value.trim();
+  const date_debut = document.getElementById('mod_date_debut').value;
+  const date_restitution = document.getElementById('mod_date_restitution').value;
+  if (!etat && !client && !date_debut && !date_restitution) {
+    document.getElementById('alert-modifier').innerHTML = '<div class="alert alert-error">❌ Modifiez au moins un champ.</div>';
+    return;
+  }
+  try {
+    const r = await fetch(`${API()}/modifier`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contrat_id, etat: etat || null, client_locataire: client || null, date_debut: date_debut || null, date_restitution: date_restitution || null })
+    });
+    const data = await r.json();
+    if (data.success) {
+      fermerModal();
+      testerConnexion();
+      document.querySelectorAll('[id^="result-"]').forEach(d => { if (d.innerHTML) d.innerHTML = '<div class="empty">Relancez votre recherche pour voir les changements.</div>'; });
+    } else {
+      document.getElementById('alert-modifier').innerHTML = `<div class="alert alert-error">❌ ${data.message}</div>`;
+    }
+  } catch {
+    document.getElementById('alert-modifier').innerHTML = '<div class="alert alert-error">❌ Erreur de connexion.</div>';
+  }
+}
+
+async function supprimerVehicule() {
+  const id = document.getElementById('del_vehicule_id').value;
+  try {
+    const r = await fetch(`${API()}/supprimer`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vehicule_id: id })
+    });
+    const data = await r.json();
+    if (data.success) {
+      fermerModal();
+      testerConnexion();
+      document.querySelectorAll('[id^="result-"]').forEach(d => { if (d.innerHTML) d.innerHTML = '<div class="empty">Relancez votre recherche pour voir les changements.</div>'; });
+    } else {
+      document.getElementById('alert-supprimer').innerHTML = `<div class="alert alert-error">❌ ${data.message}</div>`;
+    }
+  } catch {
+    document.getElementById('alert-supprimer').innerHTML = '<div class="alert alert-error">❌ Erreur de connexion.</div>';
+  }
+}
+
+document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => { if (e.target === m) fermerModal(); }));
+
+setTimeout(() => filtrerEtat('Loué', document.querySelector('#panel-etat .filter-btn')), 1000);
+</script>
+</body>
+</html>
