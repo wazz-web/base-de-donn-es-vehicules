@@ -2,11 +2,12 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import psycopg2
 import psycopg2.extras
+import os
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-DATABASE_URL = "postgresql://donnee_vehicules_user:tgoRoBgdKNZndaw4S3gQn4GJomHNhrpH@dpg-d8630at7vvec73eoq7ag-a.frankfurt-postgres.render.com/donnee_vehicules"
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 # ─── Identifiants autorisés ───────────────────────────────────────────────────
 USERS = {
